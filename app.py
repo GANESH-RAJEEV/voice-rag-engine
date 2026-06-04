@@ -9,7 +9,6 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter
 from streamlit_mic_recorder import mic_recorder
 
 # 1. SYSTEM INITIALIZATION & CORE CONFIGS
-# 1. SYSTEM INITIALIZATION & CORE CONFIGS
 load_dotenv()
 
 # Streamlit Cloud passes secrets via st.secrets, while local uses os.getenv
@@ -27,7 +26,7 @@ else:
 CHROMA_PATH, EXPORT_DIR = "./chroma_db", "saved_chats"
 for d in [EXPORT_DIR, CHROMA_PATH]: Path(d).mkdir(parents=True, exist_ok=True)
 
-# FIX: Switched to the live supported model identifiers
+# Mainline supported model identifiers
 LLM_MODEL = "gemini-1.5-flash"
 EMBED_MODEL = "models/gemini-embedding-001" 
 FALLBACK_ERROR = "I could not find that information in the uploaded context."
@@ -53,14 +52,13 @@ def get_vector_collection():
 
 collection_instance = get_vector_collection()
 
-
+# FIX: Uses direct batching into 'content' and correctly flattens the output shape for ChromaDB
 def embed_io(texts, task="retrieval_document"):
-    # If it's a single string, wrap it in a list to normalize processing
     if isinstance(texts, str):
         texts = [texts]
     
     embeddings = []
-    batch_size = 30  # Safe batch size to stay well under token-per-minute (TPM) limits
+    batch_size = 30  # Group chunks to stay safely under free-tier RPM ceilings
     
     for i in range(0, len(texts), batch_size):
         batch = texts[i:i + batch_size]
@@ -69,37 +67,23 @@ def embed_io(texts, task="retrieval_document"):
         
         while retries > 0:
             try:
-                # CRITICAL LEGACY SDK FIX: 
-                # For a list of multiple items, we must use contents=batch.
-                # For a single item, we use content=batch[0].
-                if len(batch) > 1:
-                    response = genai.embed_content(
-                        model=EMBED_MODEL,
-                        contents=batch,  # Notice the plural 'contents'
-                        task_type=task
-                    )
-                else:
-                    response = genai.embed_content(
-                        model=EMBED_MODEL,
-                        content=batch[0], # Notice the singular 'content'
-                        task_type=task
-                    )
+                # The singular 'content' parameter natively accepts lists of strings for batch processing
+                response = genai.embed_content(
+                    model=EMBED_MODEL,
+                    content=batch,
+                    task_type=task
+                )
                 
-                # Extract the vectors based on response structure
-                if "embedding" in response:
-                    # If it's a batch response, it returns a list of dicts/lists
-                    if isinstance(response["embedding"], list) and len(response["embedding"]) > 0:
-                        # Check if it's a nested list of embeddings or a single vector
-                        if isinstance(response["embedding"][0], (list, float, int)):
-                            # If it's a single string wrapped in a list, wrap the response to extend cleanly
-                            if len(batch) == 1 and not isinstance(response["embedding"][0], list):
-                                embeddings.append(response["embedding"])
-                            else:
-                                embeddings.extend(response["embedding"])
-                        else:
-                            embeddings.append(response["embedding"])
+                res_vectors = response.get("embedding", [])
                 
-                # Introduce a solid baseline pause between batches to let the RPM quota rest
+                # Format output matrix to guarantee a strict list-of-lists structure
+                if res_vectors:
+                    if len(batch) == 1 and not isinstance(res_vectors[0], list):
+                        embeddings.append(res_vectors)
+                    else:
+                        embeddings.extend(res_vectors)
+                
+                # Explicit baseline delay between batches to respect rate windows
                 time.sleep(1.0)
                 break
                 
@@ -107,7 +91,7 @@ def embed_io(texts, task="retrieval_document"):
                 if "429" in str(e) or "ResourceExhausted" in str(e):
                     retries -= 1
                     if retries == 0:
-                        st.error("🚨 Gemini API Free Tier Quota Exhausted. Please wait 60 seconds and click Build again.")
+                        st.error("🚨 Gemini API Free Tier Quota Exhausted. Please wait 60 seconds and try building again.")
                         raise e
                     import random
                     time.sleep(delay + random.uniform(0, 1))
@@ -116,6 +100,7 @@ def embed_io(texts, task="retrieval_document"):
                     raise e
                     
     return embeddings
+
 # Helper function to convert text to speech using the HTML5 Web Speech API
 def text_to_speech_autoplay(text_content):
     """Injects a clean browser-native JavaScript snippet to instantly read out answers."""
@@ -294,7 +279,6 @@ if question:
         elif st.session_state.db_chunk_count == 0:
             st.warning("⚠️ Vector Base is empty. Build via sidebar first.")
         else:
-            # FIX: Unified query lookup using the corrected custom embed_io layout
             q_emb = embed_io(question, task="retrieval_query")[0]
             hits = collection_instance.query(query_embeddings=[q_emb], n_results=3, include=["documents", "metadatas"])
             
