@@ -30,11 +30,15 @@ if GOOGLE_API_KEY:
 CHROMA_PATH, EXPORT_DIR = "./chroma_db", "saved_chats"
 for d in [EXPORT_DIR, CHROMA_PATH]: Path(d).mkdir(parents=True, exist_ok=True)
 
-LLM_MODEL, EMBED_MODEL = "gemini-3.5-flash", "gemini-embedding-004"
+LLM_MODEL = "gemini-3.5-flash"
 FALLBACK_ERROR = "I could not find that information in the uploaded context."
 
 # OPTIMIZATION: Instantiate the model once globally instead of inside the function loop
 AI_MODEL_INSTANCE = genai.GenerativeModel(LLM_MODEL)
+gemini_embedding_function = embedding_functions.GoogleGenerativeAiEmbeddingFunction(
+    api_key=GOOGLE_API_KEY,
+    model_name="models/gemini-embedding-001" 
+)
 
 st.set_page_config(page_title="AI Research Engine", layout="wide")
 st.title("⚡ Optimized Voice-Enabled Knowledge Engine")
@@ -58,7 +62,7 @@ def get_vector_collection():
 collection_instance = get_vector_collection()
 
 def embed_io(texts, task="retrieval_document"):
-    return [genai.embed_content(model=EMBED_MODEL, content=t, task_type=task)["embedding"] for t in texts]
+    return gemini_embedding_function(texts)
 
 # NEW: Helper function to convert text to speech using the HTML5 Web Speech API
 def text_to_speech_autoplay(text_content):
@@ -232,7 +236,7 @@ if question:
         elif st.session_state.db_chunk_count == 0:
             st.warning("⚠️ Vector Base is empty. Build via sidebar first.")
         else:
-            q_emb = genai.embed_content(model=EMBED_MODEL, content=question, task_type="retrieval_query")["embedding"]
+            q_emb = gemini_embedding_function([question])[0]
             hits = collection_instance.query(query_embeddings=[q_emb], n_results=3, include=["documents", "metadatas"])
             
             if not hits["documents"] or not hits["documents"][0]:
