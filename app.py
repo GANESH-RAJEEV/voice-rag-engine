@@ -18,7 +18,7 @@ if GOOGLE_API_KEY:
 CHROMA_PATH, EXPORT_DIR = "./chroma_db", "saved_chats"
 for d in [EXPORT_DIR, CHROMA_PATH]: Path(d).mkdir(parents=True, exist_ok=True)
 
-LLM_MODEL, EMBED_MODEL = "gemini-3.5-flash", "gemini-embedding-001"
+LLM_MODEL, EMBED_MODEL = "gemini-3.5-flash", "models/gemini-embedding-001"
 FALLBACK_ERROR = "I could not find that information in the uploaded context."
 
 # OPTIMIZATION: Instantiate the model once globally instead of inside the function loop
