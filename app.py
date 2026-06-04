@@ -21,7 +21,7 @@ if GOOGLE_API_KEY:
     genai.configure(api_key=GOOGLE_API_KEY)
 else:
     st.error("API Key missing! Please configure GOOGLE_API_KEY in your settings.")
-    
+
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY", "")
 if GOOGLE_API_KEY:
     genai.configure(api_key=GOOGLE_API_KEY)
@@ -29,7 +29,7 @@ if GOOGLE_API_KEY:
 CHROMA_PATH, EXPORT_DIR = "./chroma_db", "saved_chats"
 for d in [EXPORT_DIR, CHROMA_PATH]: Path(d).mkdir(parents=True, exist_ok=True)
 
-LLM_MODEL, EMBED_MODEL = "gemini-3.5-flash", "models/text-embedding-004"
+LLM_MODEL, EMBED_MODEL = "gemini-1.5-flash", "models/embedding-001"
 FALLBACK_ERROR = "I could not find that information in the uploaded context."
 
 # OPTIMIZATION: Instantiate the model once globally instead of inside the function loop
