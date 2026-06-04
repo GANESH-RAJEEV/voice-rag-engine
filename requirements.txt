@@ -1,8 +1,10 @@
 google-genai
+google-generativeai
 langchain
 langchain-community
 langchain-chroma
 beautifulsoup4
+bs4
 streamlit
 streamlit-mic-recorder
 pypdf
