@@ -53,43 +53,66 @@ def get_vector_collection():
 
 collection_instance = get_vector_collection()
 
-# FIX: Robust, direct native embedding logic bypassing unstable third-party utility wrappers
-# FIX: Added rate-limit handling with progressive backoff and sleep mechanisms
+
 def embed_io(texts, task="retrieval_document"):
+    # If it's a single string, wrap it in a list to normalize processing
     if isinstance(texts, str):
         texts = [texts]
     
     embeddings = []
-    for t in texts:
-        retries = 5
-        delay = 1.0  # Start with a 1-second delay threshold
+    batch_size = 30  # Safe batch size to stay well under token-per-minute (TPM) limits
+    
+    for i in range(0, len(texts), batch_size):
+        batch = texts[i:i + batch_size]
+        retries = 3
+        delay = 2.0
         
         while retries > 0:
             try:
-                response = genai.embed_content(
-                    model=EMBED_MODEL,
-                    content=t,
-                    task_type=task
-                )
-                embeddings.append(response["embedding"])
+                # CRITICAL LEGACY SDK FIX: 
+                # For a list of multiple items, we must use contents=batch.
+                # For a single item, we use content=batch[0].
+                if len(batch) > 1:
+                    response = genai.embed_content(
+                        model=EMBED_MODEL,
+                        contents=batch,  # Notice the plural 'contents'
+                        task_type=task
+                    )
+                else:
+                    response = genai.embed_content(
+                        model=EMBED_MODEL,
+                        content=batch[0], # Notice the singular 'content'
+                        task_type=task
+                    )
                 
-                # Introduce a tiny 100ms baseline cooldown between chunks to respect the RPM window
-                time.sleep(0.1)
-                break  # Success! Break out of retry loop
+                # Extract the vectors based on response structure
+                if "embedding" in response:
+                    # If it's a batch response, it returns a list of dicts/lists
+                    if isinstance(response["embedding"], list) and len(response["embedding"]) > 0:
+                        # Check if it's a nested list of embeddings or a single vector
+                        if isinstance(response["embedding"][0], (list, float, int)):
+                            # If it's a single string wrapped in a list, wrap the response to extend cleanly
+                            if len(batch) == 1 and not isinstance(response["embedding"][0], list):
+                                embeddings.append(response["embedding"])
+                            else:
+                                embeddings.extend(response["embedding"])
+                        else:
+                            embeddings.append(response["embedding"])
+                
+                # Introduce a solid baseline pause between batches to let the RPM quota rest
+                time.sleep(1.0)
+                break
                 
             except Exception as e:
                 if "429" in str(e) or "ResourceExhausted" in str(e):
                     retries -= 1
                     if retries == 0:
-                        st.error("🚨 API Quota fully exhausted. Please try again in a minute.")
+                        st.error("🚨 Gemini API Free Tier Quota Exhausted. Please wait 60 seconds and click Build again.")
                         raise e
-                    
-                    # Back off exponentially with a small random jitter to desynchronize requests
                     import random
-                    sleep_time = delay * (2 ** (5 - retries)) + random.uniform(0, 0.5)
-                    time.sleep(sleep_time)
+                    time.sleep(delay + random.uniform(0, 1))
+                    delay *= 2
                 else:
-                    # Reraise any non-429 unexpected runtime issues immediately
                     raise e
                     
     return embeddings
