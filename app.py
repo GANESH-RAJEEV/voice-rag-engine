@@ -53,21 +53,22 @@ def get_vector_collection():
 collection_instance = get_vector_collection()
 
 # FIX: Uses direct batching into 'content' and correctly flattens the output shape for ChromaDB
+# FIX: Micro-batching with explicit progressive delay to permanently solve 429 TPM and RPM limits
 def embed_io(texts, task="retrieval_document"):
     if isinstance(texts, str):
         texts = [texts]
     
     embeddings = []
-    batch_size = 30  # Group chunks to stay safely under free-tier RPM ceilings
+    batch_size = 5  # Micro-batches to stay safely under the 250,000 Token Per Minute (TPM) limit
     
     for i in range(0, len(texts), batch_size):
         batch = texts[i:i + batch_size]
-        retries = 3
-        delay = 2.0
+        retries = 5  # Increased retry threshold
+        delay = 3.0  # Increased baseline backup delay
         
         while retries > 0:
             try:
-                # The singular 'content' parameter natively accepts lists of strings for batch processing
+                # Direct batch request using the standard content keyword
                 response = genai.embed_content(
                     model=EMBED_MODEL,
                     content=batch,
@@ -83,19 +84,22 @@ def embed_io(texts, task="retrieval_document"):
                     else:
                         embeddings.extend(res_vectors)
                 
-                # Explicit baseline delay between batches to respect rate windows
-                time.sleep(1.0)
+                # CRITICAL: A mandatory 1.5-second sleep after every micro-batch
+                # This spaces out requests perfectly across the 60-second window
+                time.sleep(1.5)
                 break
                 
             except Exception as e:
                 if "429" in str(e) or "ResourceExhausted" in str(e):
                     retries -= 1
                     if retries == 0:
-                        st.error("🚨 Gemini API Free Tier Quota Exhausted. Please wait 60 seconds and try building again.")
+                        st.error("🚨 Gemini API Quota Exhausted. The server is heavily rate-limiting this key. Please wait a minute and click Build again.")
                         raise e
+                    
+                    # Exponential backoff with random jitter to clear the rate-limit window safely
                     import random
-                    time.sleep(delay + random.uniform(0, 1))
-                    delay *= 2
+                    sleep_time = delay * (2 ** (5 - retries)) + random.uniform(0.5, 1.5)
+                    time.sleep(sleep_time)
                 else:
                     raise e
                     
