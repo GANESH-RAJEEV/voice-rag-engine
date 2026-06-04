@@ -8,3 +8,4 @@ streamlit-mic-recorder
 pypdf
 requests
 chromadb
+protobuf==4.25.3
