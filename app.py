@@ -54,20 +54,45 @@ def get_vector_collection():
 collection_instance = get_vector_collection()
 
 # FIX: Robust, direct native embedding logic bypassing unstable third-party utility wrappers
+# FIX: Added rate-limit handling with progressive backoff and sleep mechanisms
 def embed_io(texts, task="retrieval_document"):
     if isinstance(texts, str):
         texts = [texts]
     
     embeddings = []
     for t in texts:
-        response = genai.embed_content(
-            model=EMBED_MODEL,
-            content=t,
-            task_type=task
-        )
-        embeddings.append(response["embedding"])
+        retries = 5
+        delay = 1.0  # Start with a 1-second delay threshold
+        
+        while retries > 0:
+            try:
+                response = genai.embed_content(
+                    model=EMBED_MODEL,
+                    content=t,
+                    task_type=task
+                )
+                embeddings.append(response["embedding"])
+                
+                # Introduce a tiny 100ms baseline cooldown between chunks to respect the RPM window
+                time.sleep(0.1)
+                break  # Success! Break out of retry loop
+                
+            except Exception as e:
+                if "429" in str(e) or "ResourceExhausted" in str(e):
+                    retries -= 1
+                    if retries == 0:
+                        st.error("🚨 API Quota fully exhausted. Please try again in a minute.")
+                        raise e
+                    
+                    # Back off exponentially with a small random jitter to desynchronize requests
+                    import random
+                    sleep_time = delay * (2 ** (5 - retries)) + random.uniform(0, 0.5)
+                    time.sleep(sleep_time)
+                else:
+                    # Reraise any non-429 unexpected runtime issues immediately
+                    raise e
+                    
     return embeddings
-
 # Helper function to convert text to speech using the HTML5 Web Speech API
 def text_to_speech_autoplay(text_content):
     """Injects a clean browser-native JavaScript snippet to instantly read out answers."""
