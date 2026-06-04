@@ -9,6 +9,7 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter
 from streamlit_mic_recorder import mic_recorder
 
 # 1. SYSTEM INITIALIZATION & CORE CONFIGS
+# 1. SYSTEM INITIALIZATION & CORE CONFIGS
 load_dotenv()
 
 # Streamlit Cloud passes secrets via st.secrets, while local uses os.getenv
@@ -20,19 +21,18 @@ else:
 if GOOGLE_API_KEY:
     genai.configure(api_key=GOOGLE_API_KEY)
 else:
-    st.error("API Key missing! Please configure GOOGLE_API_KEY in your Streamlit Advanced Secrets or local .env file.")
+    st.error("API Key missing! Please configure GOOGLE_API_KEY in your settings.")
     st.stop()
 
 CHROMA_PATH, EXPORT_DIR = "./chroma_db", "saved_chats"
-for d in [EXPORT_DIR, CHROMA_PATH]: 
-    Path(d).mkdir(parents=True, exist_ok=True)
+for d in [EXPORT_DIR, CHROMA_PATH]: Path(d).mkdir(parents=True, exist_ok=True)
 
-# Stable, production-ready model declarations
+# FIX: Switched to the live supported model identifiers
 LLM_MODEL = "gemini-1.5-flash"
-EMBED_MODEL = "models/text-embedding-004"
+EMBED_MODEL = "models/gemini-embedding-001" 
 FALLBACK_ERROR = "I could not find that information in the uploaded context."
 
-# OPTIMIZATION: Instantiate the model once globally instead of inside the function loop
+# Initialize the generative model instance once globally
 AI_MODEL_INSTANCE = genai.GenerativeModel(LLM_MODEL)
 
 st.set_page_config(page_title="AI Research Engine", layout="wide")
