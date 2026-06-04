@@ -8,6 +8,7 @@ from dotenv import load_dotenv
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 # NEW: Import for browser-level audio capture
 from streamlit_mic_recorder import mic_recorder
+import chromadb.utils.embedding_functions as embedding_functions
 
 # 1. SYSTEM INITIALIZATION & CORE CONFIGS
 load_dotenv()
@@ -29,7 +30,7 @@ if GOOGLE_API_KEY:
 CHROMA_PATH, EXPORT_DIR = "./chroma_db", "saved_chats"
 for d in [EXPORT_DIR, CHROMA_PATH]: Path(d).mkdir(parents=True, exist_ok=True)
 
-LLM_MODEL, EMBED_MODEL = "gemini-1.5-flash", "models/embedding-001"
+LLM_MODEL, EMBED_MODEL = "gemini-3.5-flash", "gemini-embedding-004"
 FALLBACK_ERROR = "I could not find that information in the uploaded context."
 
 # OPTIMIZATION: Instantiate the model once globally instead of inside the function loop
