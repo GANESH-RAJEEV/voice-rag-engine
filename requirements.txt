@@ -1,0 +1,10 @@
+google-genai
+langchain
+langchain-community
+langchain-chroma
+beautifulsoup4
+streamlit
+streamlit-mic-recorder
+pypdf
+requests
+chromadb

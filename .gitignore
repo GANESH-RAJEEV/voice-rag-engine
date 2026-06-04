@@ -1,0 +1,13 @@
+.env
+chroma_db/
+crawl_data/
+saved_chats/
+__pycache__/
+*.pyc
+
+# Virtual Environments
+.venv/
+venv/
+
+# IDE / Extension configs
+.qodo/
