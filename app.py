@@ -11,6 +11,17 @@ from streamlit_mic_recorder import mic_recorder
 
 # 1. SYSTEM INITIALIZATION & CORE CONFIGS
 load_dotenv()
+# Streamlit Cloud passes secrets via st.secrets, while local uses os.getenv
+if "GOOGLE_API_KEY" in st.secrets:
+    GOOGLE_API_KEY = st.secrets["GOOGLE_API_KEY"]
+else:
+    GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY", "")
+
+if GOOGLE_API_KEY:
+    genai.configure(api_key=GOOGLE_API_KEY)
+else:
+    st.error("API Key missing! Please configure GOOGLE_API_KEY in your settings.")
+    
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY", "")
 if GOOGLE_API_KEY:
     genai.configure(api_key=GOOGLE_API_KEY)
